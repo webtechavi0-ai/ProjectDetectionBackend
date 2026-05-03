@@ -1,0 +1,29 @@
+require('dotenv').config();
+
+module.exports = {
+  nodeEnv: process.env.NODE_ENV || 'development',
+  port: process.env.PORT || 5000,
+  mongodbUri: process.env.MONGODB_URI,
+  jwtSecret: process.env.JWT_SECRET,
+  jwtExpire: process.env.JWT_EXPIRE || '7d',
+  googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY,
+  openRouterApiKey: process.env.OPENROUTER_API_KEY,
+  openRouterModel: process.env.OPENROUTER_MODEL || 'openai/gpt-4-turbo',
+  smtp: {
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT) || 587,
+    secure: process.env.SMTP_SECURE === 'true',
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+  rateLimiting: {
+    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 900000,
+    maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
+  },
+  corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  twilio: {
+    accountSid: process.env.TWILIO_ACCOUNT_SID,
+    authToken: process.env.TWILIO_AUTH_TOKEN,
+    phoneNumber: process.env.TWILIO_PHONE_NUMBER,
+  },
+};
