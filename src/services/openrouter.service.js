@@ -15,7 +15,7 @@ class OpenRouterService {
         {
           model: model || this.defaultModel,
           messages,
-          temperature: options.temperature || 0.7,
+          temperature: options.temperature || 0.3,
           max_tokens: options.maxTokens || 1000,
           top_p: options.topP || 1,
           frequency_penalty: options.frequencyPenalty || 0,
@@ -57,7 +57,7 @@ class OpenRouterService {
     ];
 
     const result = await this.generateCompletion(messages, null, {
-      temperature: 0.5,
+      temperature: 0.3,
       maxTokens: 300,
     });
 
