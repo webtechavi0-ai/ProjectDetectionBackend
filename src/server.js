@@ -15,6 +15,7 @@ const authRoutes = require('./routes/auth.routes');
 const searchRoutes = require('./routes/search.routes');
 const messageRoutes = require('./routes/message.routes');
 const exportRoutes = require('./routes/export.routes');
+const adminRoutes = require('./routes/admin.routes');
 
 const app = express();
 
@@ -48,6 +49,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/export', exportRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.use((req, res) => {
   res.status(404).json({
