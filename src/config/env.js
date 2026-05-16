@@ -7,8 +7,11 @@ module.exports = {
   jwtSecret: process.env.JWT_SECRET,
   jwtExpire: process.env.JWT_EXPIRE || '7d',
   googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY,
-  openRouterApiKey: process.env.OPENROUTER_API_KEY,
-  openRouterModel: process.env.OPENROUTER_MODEL || 'openai/gpt-4-turbo',
+  anthropic: {
+    apiKey: process.env.ANTHROPIC_API_KEY,
+    model: process.env.CLAUDE_MODEL || 'claude-sonnet-4-20250514',
+    maxTokens: parseInt(process.env.CLAUDE_MAX_TOKENS) || 192,
+  },
   smtp: {
     host: process.env.SMTP_HOST,
     port: parseInt(process.env.SMTP_PORT) || 587,

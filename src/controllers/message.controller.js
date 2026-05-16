@@ -1,6 +1,6 @@
 const Message = require('../models/Message');
 const Business = require('../models/Business');
-const openRouterService = require('../services/openrouter.service');
+const anthropicService = require('../services/anthropic.service');
 const emailService = require('../services/email.service');
 
 exports.generateMessage = async (req, res, next) => {
@@ -16,8 +16,8 @@ exports.generateMessage = async (req, res, next) => {
     }
 
     const [summaryResult, outreachResult] = await Promise.allSettled([
-      openRouterService.generateBusinessSummary(business),
-      openRouterService.generateOutreachMessage(business, userGoal),
+      anthropicService.generateBusinessSummary(business),
+      anthropicService.generateOutreachMessage(business, userGoal),
     ]);
 
     const summary = summaryResult.status === 'fulfilled' ? summaryResult.value : null;
@@ -144,7 +144,7 @@ exports.bulkSendMessages = async (req, res, next) => {
         subject: subject || `Business Inquiry - ${b.name}`,
       }));
     } else {
-      const aiMessages = await openRouterService.generateBulkOutreach(businesses, userGoal);
+      const aiMessages = await anthropicService.generateBulkOutreach(businesses, userGoal);
       messages = aiMessages
         .filter((m) => m.success)
         .map((m) => {
