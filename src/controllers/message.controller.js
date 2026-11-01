@@ -3,6 +3,16 @@ const Business = require('../models/Business');
 const anthropicService = require('../services/anthropic.service');
 const emailService = require('../services/email.service');
 
+// Used whenever AI generation is unavailable or returns nothing, so every business still gets a message.
+const buildFallbackMessage = (business) =>
+  `Hi ${business.name} team,
+
+I came across ${business.name} and was impressed by what you've built. Would you like to modify or improve your website, app, or any other part of your online presence? We help businesses like yours with redesigns, new features, performance improvements and more.
+
+If you're interested, just reply to this message and we'll set up a quick call to discuss what you need.
+
+Looking forward to hearing from you.`;
+
 exports.generateMessage = async (req, res, next) => {
   try {
     const { businessId, userGoal } = req.body;
@@ -23,10 +33,7 @@ exports.generateMessage = async (req, res, next) => {
     const summary = summaryResult.status === 'fulfilled' ? summaryResult.value : null;
     const outreachMessage = outreachResult.status === 'fulfilled' ? outreachResult.value : null;
 
-    if (!outreachMessage) {
-      const reason = outreachResult.reason?.message || 'AI returned empty response';
-      return res.status(502).json({ success: false, message: `Message generation failed: ${reason}` });
-    }
+    const aiGenerated = Boolean(outreachMessage);
 
     res.json({
       success: true,
@@ -34,8 +41,11 @@ exports.generateMessage = async (req, res, next) => {
         businessId: business._id,
         businessName: business.name,
         summary,
-        message: outreachMessage,
-        suggestedSubject: `Partnership Opportunity with ${business.name}`,
+        message: outreachMessage || buildFallbackMessage(business),
+        aiGenerated,
+        suggestedSubject: aiGenerated
+          ? `Partnership Opportunity with ${business.name}`
+          : `Want to improve ${business.name}'s website or app?`,
       },
     });
   } catch (error) {
@@ -142,23 +152,36 @@ exports.bulkSendMessages = async (req, res, next) => {
         business: b,
         content,
         subject: subject || `Business Inquiry - ${b.name}`,
+        aiGenerated: false,
       }));
     } else {
-      const aiMessages = await anthropicService.generateBulkOutreach(businesses, userGoal);
-      messages = aiMessages
-        .filter((m) => m.success)
-        .map((m) => {
-          const business = businesses.find((b) => b._id.toString() === m.businessId.toString());
-          return {
-            business,
-            content: m.message,
-            subject: subject || `Partnership Opportunity with ${business.name}`,
-          };
-        });
+      const aiMessages = await anthropicService
+        .generateBulkOutreach(businesses, userGoal)
+        .catch(() => []);
+      const aiByBusiness = new Map(
+        aiMessages
+          .filter((m) => m.success && m.message)
+          .map((m) => [m.businessId.toString(), m.message])
+      );
+
+      // Every selected business gets a message; fall back to the default one when AI produced none.
+      messages = businesses.map((business) => {
+        const aiMessage = aiByBusiness.get(business._id.toString());
+        return {
+          business,
+          content: aiMessage || buildFallbackMessage(business),
+          subject:
+            subject ||
+            (aiMessage
+              ? `Partnership Opportunity with ${business.name}`
+              : `Want to improve ${business.name}'s website or app?`),
+          aiGenerated: Boolean(aiMessage),
+        };
+      });
     }
 
     const results = await Promise.allSettled(
-      messages.map(async ({ business, content, subject }) => {
+      messages.map(async ({ business, content, subject, aiGenerated }) => {
         const message = await Message.create({
           user: req.user.id,
           business: business._id,
@@ -169,7 +192,7 @@ exports.bulkSendMessages = async (req, res, next) => {
           },
           subject,
           content,
-          aiGenerated: !req.body.content,
+          aiGenerated,
           status: 'draft',
         });
 
