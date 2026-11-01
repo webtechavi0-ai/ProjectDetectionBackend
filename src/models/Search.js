@@ -10,12 +10,8 @@ const searchSchema = new mongoose.Schema({
     type: {
       type: String,
       enum: ['Point'],
-      default: 'Point',
     },
-    coordinates: {
-      type: [Number],
-      required: true,
-    },
+    coordinates: { type: [Number], default: undefined },
     address: {
       type: String,
       required: true,
@@ -23,7 +19,6 @@ const searchSchema = new mongoose.Schema({
   },
   radius: {
     type: Number,
-    required: true,
     min: 0.1,
     max: 50,
   },
@@ -32,6 +27,7 @@ const searchSchema = new mongoose.Schema({
     minRating: Number,
     openNow: Boolean,
   },
+  businesses: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Business' }],
   resultsCount: {
     type: Number,
     default: 0,
@@ -42,7 +38,6 @@ const searchSchema = new mongoose.Schema({
   },
 });
 
-searchSchema.index({ location: '2dsphere' });
 searchSchema.index({ user: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Search', searchSchema);

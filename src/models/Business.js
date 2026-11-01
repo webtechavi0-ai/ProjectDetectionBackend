@@ -18,17 +18,28 @@ const businessSchema = new mongoose.Schema({
     country: String,
     postalCode: String,
   },
+  // Optional: Play Store apps have no coordinates.
   location: {
     type: {
       type: String,
       enum: ['Point'],
-      default: 'Point',
     },
-    coordinates: {
-      type: [Number],
-      required: true,
-    },
+    coordinates: { type: [Number], default: undefined },
   },
+  developer: String,
+  summary: String,
+  installs: String,
+  icon: String,
+  url: String,
+  reviews: [
+    {
+      authorName: String,
+      rating: Number,
+      text: String,
+      time: Number,
+      profilePhotoUrl: String,
+    },
+  ],
   category: {
     type: String,
     required: true,
@@ -66,7 +77,7 @@ const businessSchema = new mongoose.Schema({
     },
     source: {
       type: String,
-      default: 'google_places',
+      default: 'google_play',
     },
   },
   createdAt: {

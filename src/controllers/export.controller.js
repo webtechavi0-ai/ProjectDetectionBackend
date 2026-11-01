@@ -16,15 +16,7 @@ exports.exportLeads = async (req, res, next) => {
         });
       }
 
-      const radiusInMeters = search.radius * 1000;
-      businesses = await Business.find({
-        location: {
-          $near: {
-            $geometry: search.location,
-            $maxDistance: radiusInMeters,
-          },
-        },
-      });
+      businesses = await Business.find({ _id: { $in: search.businesses } });
     } else {
       const messages = await Message.find({ user: req.user.id }).populate('business');
       businesses = messages.map((m) => m.business).filter(Boolean);

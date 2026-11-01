@@ -1,20 +1,15 @@
 const Search = require('../models/Search');
 const Business = require('../models/Business');
-const googlePlacesService = require('../services/googlePlaces.service');
+const playStoreService = require('../services/playStore.service');
 
 exports.searchBusinesses = async (req, res, next) => {
   try {
-    const { location, radius, category, keyword } = req.query;
+    const { location, category, keyword, country } = req.query;
 
-    const geocoded = await googlePlacesService.geocodeAddress(location);
+    // Apps have no coordinates, so `location` is used as the search term when no keyword is given.
+    const term = [keyword || location, category].filter(Boolean).join(' ');
 
-    const places = await googlePlacesService.searchNearbyPlaces(
-      geocoded.lat,
-      geocoded.lng,
-      parseFloat(radius),
-      category,
-      keyword
-    );
+    const places = await playStoreService.searchApps(term, { country: country || undefined });
 
     const businesses = await Promise.all(
       places.map(async (place) => {
@@ -23,12 +18,12 @@ exports.searchBusinesses = async (req, res, next) => {
         if (!business) {
           // Fetch detailed information for new businesses
           try {
-            const detailedPlace = await googlePlacesService.getPlaceDetails(place.placeId);
+            const detailedPlace = await playStoreService.getAppDetails(place.placeId);
             business = await Business.create({
               ...detailedPlace,
               metadata: {
                 lastUpdated: new Date(),
-                source: 'google_places',
+                source: 'google_play',
               },
             });
           } catch (error) {
@@ -38,7 +33,7 @@ exports.searchBusinesses = async (req, res, next) => {
               ...place,
               metadata: {
                 lastUpdated: new Date(),
-                source: 'google_places',
+                source: 'google_play',
               },
             });
           }
@@ -47,7 +42,7 @@ exports.searchBusinesses = async (req, res, next) => {
           const daysSinceUpdate = (Date.now() - business.metadata.lastUpdated) / (1000 * 60 * 60 * 24);
           if (daysSinceUpdate > 7) {
             try {
-              const detailedPlace = await googlePlacesService.getPlaceDetails(place.placeId);
+              const detailedPlace = await playStoreService.getAppDetails(place.placeId);
               Object.assign(business, detailedPlace);
               business.metadata.lastUpdated = new Date();
               await business.save();
@@ -63,15 +58,11 @@ exports.searchBusinesses = async (req, res, next) => {
 
     const search = await Search.create({
       user: req.user.id,
-      location: {
-        type: 'Point',
-        coordinates: [geocoded.lng, geocoded.lat],
-        address: geocoded.formattedAddress,
-      },
-      radius: parseFloat(radius),
+      location: { address: term },
       filters: {
         category: category ? [category] : [],
       },
+      businesses: businesses.map((b) => b._id),
       resultsCount: businesses.length,
     });
 
@@ -79,13 +70,7 @@ exports.searchBusinesses = async (req, res, next) => {
       success: true,
       data: {
         searchId: search._id,
-        location: {
-          address: geocoded.formattedAddress,
-          coordinates: {
-            lat: geocoded.lat,
-            lng: geocoded.lng,
-          },
-        },
+        location: { address: term },
         count: businesses.length,
         businesses: businesses.map((b) => ({
           id: b._id,
@@ -94,10 +79,12 @@ exports.searchBusinesses = async (req, res, next) => {
           address: b.address.formatted,
           category: b.category,
           types: b.types,
-          location: {
-            lat: b.location.coordinates[1],
-            lng: b.location.coordinates[0],
-          },
+          developer: b.developer,
+          summary: b.summary,
+          installs: b.installs,
+          icon: b.icon,
+          url: b.url,
+          email: b.email,
           phone: b.phone,
           website: b.website,
           rating: b.rating,
@@ -132,7 +119,7 @@ exports.getBusinessDetails = async (req, res, next) => {
     
     if (hoursSinceUpdate > 24) {
       try {
-        const updatedDetails = await googlePlacesService.getPlaceDetails(business.placeId);
+        const updatedDetails = await playStoreService.getAppDetails(business.placeId);
         
         business = await Business.findByIdAndUpdate(
           id,
@@ -140,7 +127,7 @@ exports.getBusinessDetails = async (req, res, next) => {
             ...updatedDetails,
             metadata: {
               lastUpdated: new Date(),
-              source: 'google_places',
+              source: 'google_play',
             },
           },
           { new: true }

@@ -25,10 +25,10 @@ exports.loginValidation = [
 ];
 
 exports.searchValidation = [
-  query('location').notEmpty().withMessage('Location is required'),
-  query('radius')
-    .isFloat({ min: 0.1, max: 50 })
-    .withMessage('Radius must be between 0.1 and 50 km'),
+  query('keyword')
+    .if(query('location').not().exists({ checkFalsy: true }))
+    .notEmpty()
+    .withMessage('Keyword or location is required'),
 ];
 
 exports.messageValidation = [

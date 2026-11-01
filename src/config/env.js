@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ override: true });
 
 module.exports = {
   nodeEnv: process.env.NODE_ENV || 'development',
@@ -6,7 +6,6 @@ module.exports = {
   mongodbUri: process.env.MONGODB_URI,
   jwtSecret: process.env.JWT_SECRET,
   jwtExpire: process.env.JWT_EXPIRE || '7d',
-  googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY,
   anthropic: {
     apiKey: process.env.ANTHROPIC_API_KEY,
     model: process.env.CLAUDE_MODEL || 'claude-sonnet-4-20250514',
