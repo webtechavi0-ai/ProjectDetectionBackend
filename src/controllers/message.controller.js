@@ -4,14 +4,20 @@ const anthropicService = require('../services/anthropic.service');
 const emailService = require('../services/email.service');
 
 // Used whenever AI generation is unavailable or returns nothing, so every business still gets a message.
-const buildFallbackMessage = (business) =>
-  `Hi ${business.name} team,
+const buildFallbackMessage = (business, userGoal) => {
+  const goal = typeof userGoal === 'string' ? userGoal.trim() : '';
+  const offer = goal
+    ? `I'm reaching out to ${goal}. Would you also like to modify or improve your website, app, or any other part of your online presence?`
+    : `Would you like to modify or improve your website, app, or any other part of your online presence? We help businesses like yours with redesigns, new features, performance improvements and more.`;
 
-I came across ${business.name} and was impressed by what you've built. Would you like to modify or improve your website, app, or any other part of your online presence? We help businesses like yours with redesigns, new features, performance improvements and more.
+  return `Hi ${business.name} team,
+
+I came across ${business.name} and was impressed by what you've built. ${offer}
 
 If you're interested, just reply to this message and we'll set up a quick call to discuss what you need.
 
 Looking forward to hearing from you.`;
+};
 
 exports.generateMessage = async (req, res, next) => {
   try {
@@ -41,7 +47,7 @@ exports.generateMessage = async (req, res, next) => {
         businessId: business._id,
         businessName: business.name,
         summary,
-        message: outreachMessage || buildFallbackMessage(business),
+        message: outreachMessage || buildFallbackMessage(business, userGoal),
         aiGenerated,
         suggestedSubject: aiGenerated
           ? `Partnership Opportunity with ${business.name}`
@@ -169,7 +175,7 @@ exports.bulkSendMessages = async (req, res, next) => {
         const aiMessage = aiByBusiness.get(business._id.toString());
         return {
           business,
-          content: aiMessage || buildFallbackMessage(business),
+          content: aiMessage || buildFallbackMessage(business, userGoal),
           subject:
             subject ||
             (aiMessage

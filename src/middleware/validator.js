@@ -41,5 +41,5 @@ exports.messageValidation = [
 
 exports.generateMessageValidation = [
   body('businessId').notEmpty().withMessage('Business ID is required'),
-  body('userGoal').optional().isString(),
+  body('userGoal').optional({ values: 'null' }).isString(),
 ];
