@@ -1,10 +1,15 @@
 require('dotenv').config({ override: true });
 
+const jwtSecret = process.env.JWT_SECRET;
+if (!jwtSecret) {
+  throw new Error('JWT_SECRET is required. Add it to the backend .env file.');
+}
+
 module.exports = {
   nodeEnv: process.env.NODE_ENV || 'development',
   port: process.env.PORT || 5000,
   mongodbUri: process.env.MONGODB_URI,
-  jwtSecret: process.env.JWT_SECRET,
+  jwtSecret,
   jwtExpire: process.env.JWT_EXPIRE || '7d',
   anthropic: {
     apiKey: process.env.ANTHROPIC_API_KEY,

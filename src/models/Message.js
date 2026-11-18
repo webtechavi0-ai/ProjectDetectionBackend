@@ -45,6 +45,7 @@ const messageSchema = new mongoose.Schema({
     openedAt: Date,
     errorMessage: String,
     provider: String,
+    messageId: String,
   },
   createdAt: {
     type: Date,

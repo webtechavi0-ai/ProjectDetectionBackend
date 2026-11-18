@@ -2,6 +2,25 @@ const Message = require('../models/Message');
 const Business = require('../models/Business');
 const anthropicService = require('../services/anthropic.service');
 const emailService = require('../services/email.service');
+const whatsappService = require('../services/whatsapp.service');
+
+const validateWhatsAppRequest = (req, res) => {
+  if (req.body.whatsappOptInConfirmed !== true) {
+    res.status(400).json({
+      success: false,
+      message: 'Confirm that the recipient opted in to WhatsApp messages.',
+    });
+    return false;
+  }
+
+  const configurationError = whatsappService.getConfigurationError();
+  if (configurationError) {
+    res.status(503).json({ success: false, message: configurationError });
+    return false;
+  }
+
+  return true;
+};
 
 // Used whenever AI generation is unavailable or returns nothing, so every business still gets a message.
 const buildFallbackMessage = (business, userGoal) => {
@@ -63,6 +82,10 @@ exports.sendMessage = async (req, res, next) => {
   try {
     const { businessId, channel, content, subject, recipient } = req.body;
 
+    if (channel === 'whatsapp' && !validateWhatsAppRequest(req, res)) {
+      return;
+    }
+
     const business = await Business.findById(businessId);
     if (!business) {
       return res.status(404).json({
@@ -109,7 +132,21 @@ exports.sendMessage = async (req, res, next) => {
       } else if (channel === 'sms') {
         throw new Error('SMS sending not yet implemented. Please configure Twilio.');
       } else if (channel === 'whatsapp') {
-        throw new Error('WhatsApp sending not yet implemented. Please configure WhatsApp Business API.');
+        if (!message.recipient.phone) {
+          throw new Error('No phone number available for this business');
+        }
+
+        sendResult = await whatsappService.sendWhatsAppMessage({
+          to: message.recipient.phone,
+          body: content,
+        });
+
+        message.status = 'sent';
+        message.metadata = {
+          sentAt: new Date(),
+          provider: 'twilio-whatsapp',
+          messageId: sendResult.messageId,
+        };
       }
 
       await message.save();
@@ -148,6 +185,10 @@ exports.bulkSendMessages = async (req, res, next) => {
         success: false,
         message: 'Please provide an array of business IDs',
       });
+    }
+
+    if (channel === 'whatsapp' && !validateWhatsAppRequest(req, res)) {
+      return;
     }
 
     const businesses = await Business.find({ _id: { $in: businessIds } });
@@ -202,25 +243,48 @@ exports.bulkSendMessages = async (req, res, next) => {
           status: 'draft',
         });
 
-        if (channel === 'email' && business.email) {
-          const sendResult = await emailService.sendOutreachEmail(
-            business.email,
-            subject,
-            content,
-            business.name
-          );
+        try {
+          if (channel === 'email' && business.email) {
+            const sendResult = await emailService.sendOutreachEmail(
+              business.email,
+              subject,
+              content,
+              business.name
+            );
 
-          message.status = 'sent';
-          message.metadata = {
-            sentAt: new Date(),
-            provider: 'smtp',
-            messageId: sendResult.messageId,
-          };
+            message.status = 'sent';
+            message.metadata = {
+              sentAt: new Date(),
+              provider: 'smtp',
+              messageId: sendResult.messageId,
+            };
+          } else if (channel === 'whatsapp' && business.phone) {
+            const sendResult = await whatsappService.sendWhatsAppMessage({
+              to: business.phone,
+              body: content,
+            });
+
+            message.status = 'sent';
+            message.metadata = {
+              sentAt: new Date(),
+              provider: 'twilio-whatsapp',
+              messageId: sendResult.messageId,
+            };
+          } else if (channel === 'email') {
+            throw new Error('No email available for this business');
+          } else if (channel === 'whatsapp') {
+            throw new Error('No phone number available for this business');
+          } else {
+            throw new Error('Unsupported channel');
+          }
+
           await message.save();
-
           return { businessId: business._id, businessName: business.name, success: true };
-        } else {
-          throw new Error('No email available or unsupported channel');
+        } catch (error) {
+          message.status = 'failed';
+          message.metadata = { errorMessage: error.message };
+          await message.save();
+          throw error;
         }
       })
     );
