@@ -4,7 +4,7 @@ const anthropicService = require('../services/anthropic.service');
 const emailService = require('../services/email.service');
 const whatsappService = require('../services/whatsapp.service');
 
-const validateWhatsAppRequest = (req, res) => {
+const validateWhatsAppRequest = (req, res, options) => {
   if (req.body.whatsappOptInConfirmed !== true) {
     res.status(400).json({
       success: false,
@@ -13,7 +13,7 @@ const validateWhatsAppRequest = (req, res) => {
     return false;
   }
 
-  const configurationError = whatsappService.getConfigurationError();
+  const configurationError = whatsappService.getConfigurationError(options);
   if (configurationError) {
     res.status(503).json({ success: false, message: configurationError });
     return false;
@@ -139,12 +139,13 @@ exports.sendMessage = async (req, res, next) => {
         sendResult = await whatsappService.sendWhatsAppMessage({
           to: message.recipient.phone,
           body: content,
+          businessName: business.name,
         });
 
         message.status = 'sent';
         message.metadata = {
           sentAt: new Date(),
-          provider: 'twilio-whatsapp',
+          provider: 'whatsapp-cloud-api',
           messageId: sendResult.messageId,
         };
       }
@@ -187,7 +188,10 @@ exports.bulkSendMessages = async (req, res, next) => {
       });
     }
 
-    if (channel === 'whatsapp' && !validateWhatsAppRequest(req, res)) {
+    if (
+      channel === 'whatsapp' &&
+      !validateWhatsAppRequest(req, res, { requireTemplate: true })
+    ) {
       return;
     }
 
@@ -262,12 +266,13 @@ exports.bulkSendMessages = async (req, res, next) => {
             const sendResult = await whatsappService.sendWhatsAppMessage({
               to: business.phone,
               body: content,
+              businessName: business.name,
             });
 
             message.status = 'sent';
             message.metadata = {
               sentAt: new Date(),
-              provider: 'twilio-whatsapp',
+              provider: 'whatsapp-cloud-api',
               messageId: sendResult.messageId,
             };
           } else if (channel === 'email') {

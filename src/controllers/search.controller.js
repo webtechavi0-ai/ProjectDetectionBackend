@@ -5,9 +5,49 @@ const playStoreService = require('../services/playStore.service');
 exports.searchBusinesses = async (req, res, next) => {
   try {
     const { location, category, keyword, country } = req.query;
+    const { lat, lng } = req.query;
+
+    const hasLatitude = lat !== undefined && lat !== '';
+    const hasLongitude = lng !== undefined && lng !== '';
+    if (hasLatitude !== hasLongitude) {
+      return res.status(400).json({
+        success: false,
+        message: 'Latitude and longitude must be provided together.',
+      });
+    }
+
+    let coordinates;
+    if (hasLatitude && hasLongitude) {
+      if (typeof lat !== 'string' || typeof lng !== 'string') {
+        return res.status(400).json({
+          success: false,
+          message: 'Latitude and longitude must be single numeric values.',
+        });
+      }
+
+      const latitude = Number(lat);
+      const longitude = Number(lng);
+      if (
+        !location ||
+        !Number.isFinite(latitude) ||
+        latitude < -90 ||
+        latitude > 90 ||
+        !Number.isFinite(longitude) ||
+        longitude < -180 ||
+        longitude > 180
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: 'A location and valid latitude/longitude coordinates are required.',
+        });
+      }
+
+      coordinates = [longitude, latitude];
+    }
 
     // Apps have no coordinates, so `location` is used as the search term when no keyword is given.
     const term = [keyword || location, category].filter(Boolean).join(' ');
+    const locationAddress = coordinates ? location : term;
 
     const places = await playStoreService.searchApps(term, { country: country || undefined });
 
@@ -56,9 +96,15 @@ exports.searchBusinesses = async (req, res, next) => {
       })
     );
 
+    const searchLocation = { address: locationAddress };
+    if (coordinates) {
+      searchLocation.type = 'Point';
+      searchLocation.coordinates = coordinates;
+    }
+
     const search = await Search.create({
       user: req.user.id,
-      location: { address: term },
+      location: searchLocation,
       filters: {
         category: category ? [category] : [],
       },
@@ -70,7 +116,12 @@ exports.searchBusinesses = async (req, res, next) => {
       success: true,
       data: {
         searchId: search._id,
-        location: { address: term },
+        location: {
+          address: locationAddress,
+          ...(coordinates
+            ? { latitude: coordinates[1], longitude: coordinates[0] }
+            : {}),
+        },
         count: businesses.length,
         businesses: businesses.map((b) => ({
           id: b._id,
