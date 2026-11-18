@@ -34,7 +34,7 @@ exports.searchValidation = [
 exports.messageValidation = [
   body('businessId').notEmpty().withMessage('Business ID is required'),
   body('channel')
-    .isIn(['email', 'sms', 'whatsapp'])
+    .isIn(['email'])
     .withMessage('Invalid channel'),
   body('content').notEmpty().withMessage('Message content is required'),
 ];

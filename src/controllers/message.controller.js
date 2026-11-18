@@ -2,25 +2,6 @@ const Message = require('../models/Message');
 const Business = require('../models/Business');
 const anthropicService = require('../services/anthropic.service');
 const emailService = require('../services/email.service');
-const whatsappService = require('../services/whatsapp.service');
-
-const validateWhatsAppRequest = (req, res, options) => {
-  if (req.body.whatsappOptInConfirmed !== true) {
-    res.status(400).json({
-      success: false,
-      message: 'Confirm that the recipient opted in to WhatsApp messages.',
-    });
-    return false;
-  }
-
-  const configurationError = whatsappService.getConfigurationError(options);
-  if (configurationError) {
-    res.status(503).json({ success: false, message: configurationError });
-    return false;
-  }
-
-  return true;
-};
 
 // Used whenever AI generation is unavailable or returns nothing, so every business still gets a message.
 const buildFallbackMessage = (business, userGoal) => {
@@ -82,10 +63,6 @@ exports.sendMessage = async (req, res, next) => {
   try {
     const { businessId, channel, content, subject, recipient } = req.body;
 
-    if (channel === 'whatsapp' && !validateWhatsAppRequest(req, res)) {
-      return;
-    }
-
     const business = await Business.findById(businessId);
     if (!business) {
       return res.status(404).json({
@@ -126,28 +103,13 @@ exports.sendMessage = async (req, res, next) => {
         message.status = 'sent';
         message.metadata = {
           sentAt: new Date(),
-          provider: 'smtp',
+          provider: 'brevo',
           messageId: sendResult.messageId,
         };
       } else if (channel === 'sms') {
         throw new Error('SMS sending not yet implemented. Please configure Twilio.');
-      } else if (channel === 'whatsapp') {
-        if (!message.recipient.phone) {
-          throw new Error('No phone number available for this business');
-        }
-
-        sendResult = await whatsappService.sendWhatsAppMessage({
-          to: message.recipient.phone,
-          body: content,
-          businessName: business.name,
-        });
-
-        message.status = 'sent';
-        message.metadata = {
-          sentAt: new Date(),
-          provider: 'whatsapp-cloud-api',
-          messageId: sendResult.messageId,
-        };
+      } else {
+        throw new Error('Unsupported message channel');
       }
 
       await message.save();
@@ -188,11 +150,11 @@ exports.bulkSendMessages = async (req, res, next) => {
       });
     }
 
-    if (
-      channel === 'whatsapp' &&
-      !validateWhatsAppRequest(req, res, { requireTemplate: true })
-    ) {
-      return;
+    if (channel !== 'email') {
+      return res.status(400).json({
+        success: false,
+        message: 'Bulk sending is currently available for email only.',
+      });
     }
 
     const businesses = await Business.find({ _id: { $in: businessIds } });
@@ -259,26 +221,11 @@ exports.bulkSendMessages = async (req, res, next) => {
             message.status = 'sent';
             message.metadata = {
               sentAt: new Date(),
-              provider: 'smtp',
-              messageId: sendResult.messageId,
-            };
-          } else if (channel === 'whatsapp' && business.phone) {
-            const sendResult = await whatsappService.sendWhatsAppMessage({
-              to: business.phone,
-              body: content,
-              businessName: business.name,
-            });
-
-            message.status = 'sent';
-            message.metadata = {
-              sentAt: new Date(),
-              provider: 'whatsapp-cloud-api',
+              provider: 'brevo',
               messageId: sendResult.messageId,
             };
           } else if (channel === 'email') {
             throw new Error('No email available for this business');
-          } else if (channel === 'whatsapp') {
-            throw new Error('No phone number available for this business');
           } else {
             throw new Error('Unsupported channel');
           }

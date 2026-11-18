@@ -16,12 +16,9 @@ module.exports = {
     model: process.env.CLAUDE_MODEL || 'claude-sonnet-4-20250514',
     maxTokens: parseInt(process.env.CLAUDE_MAX_TOKENS) || 192,
   },
-  smtp: {
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT) || 587,
-    secure: process.env.SMTP_SECURE === 'true',
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
+  brevo: {
+    apiKey: process.env.BREVO_API_KEY,
+    emailFrom: process.env.EMAIL_FROM,
   },
   rateLimiting: {
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 900000,

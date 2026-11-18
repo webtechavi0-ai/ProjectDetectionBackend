@@ -1,38 +1,73 @@
-const nodemailer = require('nodemailer');
 const config = require('../config/env');
 
-class EmailService {
-  constructor() {
-    this.transporter = nodemailer.createTransport({
-      host: config.smtp.host,
-      port: config.smtp.port,
-      secure: config.smtp.secure,
-      auth: {
-        user: config.smtp.user,
-        pass: config.smtp.pass,
-      },
-    });
+const BREVO_EMAIL_URL = 'https://api.brevo.com/v3/smtp/email';
+const BREVO_ACCOUNT_URL = 'https://api.brevo.com/v3/account';
+
+const parseSender = (sender) => {
+  const formattedSender = /^\s*(.*?)\s*<([^<>]+)>\s*$/.exec(sender);
+  if (formattedSender) {
+    return {
+      name: formattedSender[1] || 'Geo Outreach',
+      email: formattedSender[2].trim(),
+    };
   }
 
+  return { name: 'Geo Outreach', email: sender.trim() };
+};
+
+class EmailService {
   async sendEmail({ to, subject, text, html, from = null }) {
     try {
-      const mailOptions = {
-        from: from || config.smtp.user,
-        to,
-        subject,
-        text,
-        html: html || text,
-      };
+      if (!config.brevo.apiKey) {
+        throw new Error('BREVO_API_KEY is not configured');
+      }
 
-      const info = await this.transporter.sendMail(mailOptions);
+      const senderAddress = from || config.brevo.emailFrom;
+      if (!senderAddress) {
+        throw new Error('EMAIL_FROM is not configured');
+      }
+
+      const response = await fetch(BREVO_EMAIL_URL, {
+        method: 'POST',
+        headers: {
+          accept: 'application/json',
+          'api-key': config.brevo.apiKey,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          sender: parseSender(senderAddress),
+          to: [{ email: to }],
+          subject,
+          textContent: text,
+          htmlContent: html || text,
+        }),
+      });
+
+      const responseBody = await response.text();
+      let result = {};
+      if (responseBody) {
+        try {
+          const parsedResult = JSON.parse(responseBody);
+          if (parsedResult && typeof parsedResult === 'object') {
+            result = parsedResult;
+          }
+        } catch {
+          result = {};
+        }
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          result.message || `Brevo API request failed (${response.status}): ${responseBody}`
+        );
+      }
 
       return {
         success: true,
-        messageId: info.messageId,
-        response: info.response,
+        messageId: result.messageId,
+        response: responseBody,
       };
     } catch (error) {
-      console.error('Email sending error:', error);
       throw new Error(`Failed to send email: ${error.message}`);
     }
   }
@@ -97,8 +132,24 @@ class EmailService {
 
   async verifyConnection() {
     try {
-      await this.transporter.verify();
-      return { success: true, message: 'SMTP connection verified' };
+      if (!config.brevo.apiKey) {
+        return { success: false, message: 'BREVO_API_KEY is not configured' };
+      }
+
+      const response = await fetch(BREVO_ACCOUNT_URL, {
+        headers: {
+          accept: 'application/json',
+          'api-key': config.brevo.apiKey,
+        },
+      });
+      if (!response.ok) {
+        return {
+          success: false,
+          message: `Brevo API verification failed (${response.status})`,
+        };
+      }
+
+      return { success: true, message: 'Brevo API connection verified' };
     } catch (error) {
       return { success: false, message: error.message };
     }
