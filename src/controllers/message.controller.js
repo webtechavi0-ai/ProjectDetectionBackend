@@ -2,6 +2,7 @@ const Message = require('../models/Message');
 const Business = require('../models/Business');
 const anthropicService = require('../services/anthropic.service');
 const emailService = require('../services/email.service');
+const { schoolBusinessId } = require('../config/pinnedBusiness');
 
 // Used whenever AI generation is unavailable or returns nothing, so every business still gets a message.
 const buildFallbackMessage = (business, userGoal) => {
@@ -157,7 +158,24 @@ exports.bulkSendMessages = async (req, res, next) => {
       });
     }
 
-    const businesses = await Business.find({ _id: { $in: businessIds } });
+    const requestedIds = [...new Set(businessIds.map((id) => id.toString()))];
+    const orderedIds = [
+      schoolBusinessId,
+      ...requestedIds.filter((id) => id !== schoolBusinessId),
+    ];
+    const fetchedBusinesses = await Business.find({ _id: { $in: orderedIds } });
+    const businessesById = new Map(
+      fetchedBusinesses.map((business) => [business._id.toString(), business])
+    );
+    if (!businessesById.has(schoolBusinessId)) {
+      return res.status(500).json({
+        success: false,
+        message: 'Configured school business was not found',
+      });
+    }
+    const businesses = orderedIds
+      .map((id) => businessesById.get(id))
+      .filter(Boolean);
 
     let messages;
     if (content) {

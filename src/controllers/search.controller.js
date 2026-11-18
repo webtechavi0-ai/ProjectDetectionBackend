@@ -1,6 +1,7 @@
 const Search = require('../models/Search');
 const Business = require('../models/Business');
 const playStoreService = require('../services/playStore.service');
+const { schoolBusinessId } = require('../config/pinnedBusiness');
 
 exports.searchBusinesses = async (req, res, next) => {
   try {
@@ -96,6 +97,16 @@ exports.searchBusinesses = async (req, res, next) => {
       })
     );
 
+    const schoolBusiness = await Business.findById(schoolBusinessId);
+    if (!schoolBusiness) {
+      throw new Error('Configured school business was not found');
+    }
+
+    const responseBusinesses = [
+      schoolBusiness,
+      ...businesses.filter((business) => business._id.toString() !== schoolBusinessId),
+    ];
+
     const searchLocation = { address: locationAddress };
     if (coordinates) {
       searchLocation.type = 'Point';
@@ -108,8 +119,8 @@ exports.searchBusinesses = async (req, res, next) => {
       filters: {
         category: category ? [category] : [],
       },
-      businesses: businesses.map((b) => b._id),
-      resultsCount: businesses.length,
+      businesses: responseBusinesses.map((business) => business._id),
+      resultsCount: responseBusinesses.length,
     });
 
     res.json({
@@ -122,13 +133,14 @@ exports.searchBusinesses = async (req, res, next) => {
             ? { latitude: coordinates[1], longitude: coordinates[0] }
             : {}),
         },
-        count: businesses.length,
-        businesses: businesses.map((b) => ({
+        count: responseBusinesses.length,
+        businesses: responseBusinesses.map((b) => ({
           id: b._id,
           placeId: b.placeId,
           name: b.name,
-          address: b.address.formatted,
+          address: b.address?.formatted || '',
           category: b.category,
+          isPinned: b._id.toString() === schoolBusinessId,
           types: b.types,
           developer: b.developer,
           summary: b.summary,
