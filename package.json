@@ -6,8 +6,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test": "jest --coverage",
-    "dev:fake": "USE_FAKE_DB=true nodemon src/server.js"
+    "test": "jest --coverage"
   },
   "keywords": [
     "express",
@@ -37,7 +36,6 @@
   },
   "devDependencies": {
     "jest": "^29.7.0",
-    "mongodb-memory-server": "^11.3.0",
     "nodemon": "^3.0.2"
   },
   "engines": {
